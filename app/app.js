@@ -2,9 +2,10 @@ var fs = require('fs');
 var rmrf = require('rimraf');
 var yaml = require('js-yaml');
 var marked = require('marked');
-var mark = require('markup-js');
+var mustache = require('mustache');
 
 // generate a Ning site.
+// 生成站点
 exports.generate = function() {
     if (exists(outputDir)) {
         rmrf.sync(outputDir);
@@ -14,17 +15,20 @@ exports.generate = function() {
 }
 
 // site output dir.
+// 站点输出目录
 const outputDir = '_site';
 
-function getLayout(layoutName) {
-    if (layoutName.indexOf('.') == -1) {
-        layoutName += '.html';
-    }
-    var contents = fs.readFileSync('_layouts/' + layoutName, 'utf8');
-    return contents;
-}
-
+// render markdown formate pages to html files
+// 渲染 markdown 文件
 function copyPagesInDir(rootDir) {
+    var siteConfigFile = './_config.yaml';
+    var templateConfigFile = './_layout/_config.yaml';
+    var view = {
+        site: loadSiteVars(siteConfigFile),
+        template: loadTemplateVars(templateConfigFile),
+        page: {},
+        ning: loadNingVars()
+    };
     fs.readdirSync(rootDir).forEach(function (fileName) {
         if (fileName.startsWith('_') || fileName.startsWith('.')) {
             return;
@@ -38,35 +42,92 @@ function copyPagesInDir(rootDir) {
                 return;
             }
 
-            var out = outputDir + '/' + file;
-            out = './' + out.replace('./', '');
-            out = out.replace('.md', '.html');
-            out = out.replace('.markdown', '.html');
-            out = out.replace('.mark', '.html');
-            out = out.replace('.link', '.html');
+            var lastIndex = file.lastIndexOf('.');
+            var fileName = file.substr(0, lastIndex);
+            var pageOutPath = outputDir + '/' + fileName + '.html';
+            pageOutPath = './' + pageOutPath.replace('./', '');
 
-            checkDir(out);
-            var contents = loadMarkdownContents(fs.readFileSync(file, 'utf8'));
-            var page = contents.frontMatter || {};
-            var template = getLayout(page.layout || 'page.html');
-            var context = contents;
-            var html = mark.up(template, context);
-            fs.writeFileSync(out, html, 'utf8');
+            checkDir(pageOutPath);
+
+            // page vars
+            var pageFile = file;
+            view.page = loadPageVars(pageFile);
+
+            // template
+            var templateContent = '';
+            if (view.page.layout) {
+                templateContent = loadTemplateContent('_layout/' + view.page.layout + '.html');
+            }
+            if (templateContent === '') {
+                templateContent = loadDefaultTemplateContent();
+            }
+
+            // render & write file
+            var html = mustache.render(templateContent, view);
+            fs.writeFileSync(pageOutPath, html, 'utf8');
         }
     });
 }
 
-function loadMarkdownContents(contents) {
+// get layout file's content
+// 获取模版文件的内容
+function loadTemplateContent(file) {
+    if (!exists(file, false)) {
+        return '';
+    }
+    var contents = fs.readFileSync(file, 'utf8');
+    return contents;
+}
+
+function loadDefaultTemplateContent() {
+    var file = '_layout/default.html';
+    var content = loadTemplateContent(file);
+    return content;
+}
+
+function loadNingVars() {
+    var ning = {
+        'name': 'Ning',
+        'version': '2.0.0',
+        'author': 'Richard Libre',
+        'text': 'Powered by <a href="http://github.com/codinggirl/ning/">Ning</a>.'
+    };
+    return ning;
+}
+
+function loadSiteVars(file) {
+    var site = {};
+    if (exists(file, false)) {
+        var content = fs.readFileSync(file, 'utf8');
+        site = yaml.load(content) || {};
+    }
+    return site;
+}
+
+function loadTemplateVars(file) {
+    var template = {};
+    if (exists(file, false)) {
+        var content = fs.readFileSync(file, 'utf8');
+        template = yaml.load(content) || {};
+    }
+    return template;
+}
+
+// get markdown page's content, and convert to json object
+// 获取 markdown 内容，并设置 page 变量
+function loadPageVars(file) {
+    var page = {};
+    var contents = fs.readFileSync(file, 'utf8');
     if (contents.startsWith('---\n')) {
         var end = contents.search(/\n---\n/);
         if (end != -1) {
-            return {
-                page: yaml.load(contents.slice(4, end + 1)) || {},
-                content: marked(contents.slice(end + 5))
-            }
+            page = yaml.load(contents.slice(4, end + 1)) || {};
+            page.content = marked(contents.slice(end + 5));
         }
+    } else {
+        page.content = marked(contents)
     }
-    return { frontMatter: null, mainText: marked(contents) };
+    return page;
 }
 
 // copy raw files.
