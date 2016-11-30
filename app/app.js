@@ -133,13 +133,11 @@ function loadPageVars(file) {
 // copy raw files.
 // copy files that not *.md, *.markdown, *.link, *mark without parse.
 function copyRawFilesInDir(rootDir) {
-    var readDir = fs.readdirSync(rootDir);
-    
     fs.readdirSync(rootDir).forEach(function (fileName) {
         if (fileName.startsWith('_') || fileName.startsWith('.')) {
             return;
         }
-        if (fileName.endsWith('.markdown') || fileName.endsWith('.md') || fileName.endsWith('.link')) {
+        if (fileName.endsWith('.mark') || fileName.endsWith('.markdown') || fileName.endsWith('.md') || fileName.endsWith('.link')) {
             return;
         }
         var file = rootDir + fileName;
@@ -149,7 +147,7 @@ function copyRawFilesInDir(rootDir) {
             var out = outputDir + '/' + file;
             out = './' + out.replace('./', '');
             checkDir(out);
-            var content = fs.readFileSync(file, "utf8");
+            var content = fs.readFileSync(file);
             fs.writeFileSync(out, content, "utf8");
         }
     });
