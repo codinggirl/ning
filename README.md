@@ -1,5 +1,7 @@
 # Ning
 
+[![Greenkeeper badge](https://badges.greenkeeper.io/codinggirl/ning.svg)](https://greenkeeper.io/)
+
 Ning is a static site generator.
 
 In Ning's site, only pages supported.
